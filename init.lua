@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -102,7 +102,7 @@ vim.g.have_nerd_font = false
 vim.opt.number = true
 -- You can also add relative line numbers, to help with jumping.
 --  Experiment for yourself to see if you like it!
--- vim.opt.relativenumber = true
+vim.opt.relativenumber = true
 
 -- Enable mouse mode, can be useful for resizing splits for example!
 vim.opt.mouse = 'a'
@@ -157,6 +157,9 @@ vim.opt.cursorline = true
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.opt.scrolloff = 10
 
+-- Include $ as part of words, so they're included when renaming (Angular/RxJS uses this a lot)
+vim.opt.iskeyword:append '$'
+
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
 
@@ -173,7 +176,15 @@ vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagn
 --
 -- NOTE: This won't work in all terminal emulators/tmux/etc. Try your own mapping
 -- or just use <C-\><C-n> to exit terminal mode
-vim.keymap.set('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Exit terminal mode' })
+vim.keymap.set('t', '<Esc><Esc>', function()
+  -- Do not close lazygit on escape
+  if string.find(vim.api.nvim_buf_get_name(0), 'lazygit') then
+    return
+  end
+
+  local exit_terminal_keys = vim.api.nvim_replace_termcodes('<C-\\><C-n>', true, true, true)
+  vim.api.nvim_feedkeys(exit_terminal_keys, 'n', true)
+end, { desc = 'Exit terminal mode' })
 
 -- TIP: Disable arrow keys in normal mode
 -- vim.keymap.set('n', '<left>', '<cmd>echo "Use h to move!!"<CR>')
@@ -190,6 +201,20 @@ vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right win
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 
+-- [[ Custom Keymaps ]]
+
+-- Center the cursor line after jumping
+vim.keymap.set('n', '<C-d>', '<C-d>zz', { noremap = true })
+vim.keymap.set('n', '<C-u>', '<C-u>zz', { noremap = true })
+vim.keymap.set('n', 'n', 'nzz', { noremap = true })
+vim.keymap.set('n', 'N', 'Nzz', { noremap = true })
+
+-- Yank the whole line with Y like in Ideavim
+vim.keymap.set('n', 'Y', 'yy', { noremap = true })
+
+vim.keymap.set('n', '<leader>vs', ':vsplit<CR>', { noremap = true })
+vim.keymap.set('n', '<leader>vv', ':split<CR>', { noremap = true })
+
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 
@@ -203,6 +228,31 @@ vim.api.nvim_create_autocmd('TextYankPost', {
     vim.highlight.on_yank()
   end,
 })
+
+-- Auto-save files
+vim.api.nvim_create_autocmd({ 'FocusLost', 'ModeChanged', 'TextChanged', 'BufEnter' }, {
+  desc = 'autosave',
+  pattern = '*',
+  command = 'silent! update',
+})
+
+vim.filetype.add {
+  extension = {
+    env = 'sh',
+  },
+  filename = {
+    ['.env'] = 'sh',
+  },
+  pattern = {
+    ['%.env%.[%w_.-]+'] = 'sh',
+  },
+
+  vim.filetype.add {
+    pattern = {
+      ['.*%.nunjucks'] = 'twig',
+    },
+  },
+}
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -246,12 +296,49 @@ require('lazy').setup({
   { -- Adds git related signs to the gutter, as well as utilities for managing changes
     'lewis6991/gitsigns.nvim',
     opts = {
+      on_attach = function(bufnr)
+        local gitsigns = require 'gitsigns'
+
+        local function map(mode, l, r, opts)
+          opts = opts or {}
+          opts.buffer = bufnr
+          vim.keymap.set(mode, l, r, opts)
+        end
+
+        -- Navigation
+        map('n', ']c', function()
+          if vim.wo.diff then
+            vim.cmd.normal { ']c', bang = true }
+          else
+            gitsigns.nav_hunk 'next'
+          end
+        end, { desc = 'Jump to next git [c]hange' })
+
+        map('n', '[c', function()
+          if vim.wo.diff then
+            vim.cmd.normal { '[c', bang = true }
+          else
+            gitsigns.nav_hunk 'prev'
+          end
+        end, { desc = 'Jump to previous [c]hange' })
+
+        map('n', '<leader>gp', gitsigns.preview_hunk, { desc = 'git [p]review hunk' })
+      end,
       signs = {
         add = { text = '+' },
         change = { text = '~' },
         delete = { text = '_' },
         topdelete = { text = '‾' },
         changedelete = { text = '~' },
+      },
+      current_line_blame = true,
+      current_line_blame_opts = {
+        virt_text = true,
+        virt_text_props = 'eol', -- 'eol' | 'overlay' | 'right_align'
+        delay = 500,
+        ignore_whitespace = false,
+        virt_text_priority = 100,
+        use_focus = true,
       },
     },
   },
@@ -388,6 +475,11 @@ require('lazy').setup({
         --   },
         -- },
         -- pickers = {}
+        defaults = {
+          layout_config = {
+            width = 0.95,
+          },
+        },
         extensions = {
           ['ui-select'] = {
             require('telescope.themes').get_dropdown(),
@@ -435,6 +527,21 @@ require('lazy').setup({
         builtin.find_files { cwd = vim.fn.stdpath 'config' }
       end, { desc = '[S]earch [N]eovim files' })
     end,
+  },
+  {
+    'danielfalk/smart-open.nvim',
+    branch = '0.2.x',
+    config = function()
+      require('telescope').load_extension 'smart_open'
+
+      vim.keymap.set('n', '<leader><leader>', function()
+        require('telescope').extensions.smart_open.smart_open { cwd_only = true }
+      end, { noremap = true, silent = true })
+    end,
+    dependencies = {
+      'kkharji/sqlite.lua',
+      { 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
+    },
   },
 
   -- LSP Plugins
@@ -537,7 +644,7 @@ require('lazy').setup({
 
           -- Rename the variable under your cursor.
           --  Most Language Servers support renaming across files, etc.
-          map('<leader>rn', vim.lsp.buf.rename, '[R]e[n]ame')
+          -- map('<leader>rn', vim.lsp.buf.rename, '[R]e[n]ame')
 
           -- Execute a code action, usually your cursor needs to be on top of an error
           -- or a suggestion from your LSP for this to activate.
@@ -546,6 +653,8 @@ require('lazy').setup({
           -- WARN: This is not Goto Definition, this is Goto Declaration.
           --  For example, in C this would take you to the header.
           map('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
+
+          map('gh', vim.lsp.buf.hover, '[H]over')
 
           -- The following two autocommands are used to highlight references of the
           -- word under your cursor when your cursor rests there for a little while.
@@ -632,6 +741,110 @@ require('lazy').setup({
             },
           },
         },
+
+        biome = {
+          filteypes = {
+            'javascript',
+            'javascriptreact',
+            'json',
+            'jsonc',
+            'typescript',
+            'typescript.tsx',
+            'typescriptreact',
+          },
+
+          root_dir = require('lspconfig.util').root_pattern 'biome.json',
+        },
+
+        -- For some reason the example lint plugin with eslint_d doesn't work, so I have to use eslint :(
+        -- Requires `vscode-langservers-extracted` to be installed globally with npm / pnpm
+        eslint = {
+          filetypes = {
+            'javascript',
+            'javascriptreact',
+            'javascript.jsx',
+            'typescript',
+            'typescriptreact',
+            'typescript.tsx',
+            'html',
+            'htmlangular',
+            'svelte',
+            'astro',
+          },
+          on_attach = function(_client, bufnr)
+            -- Auto-fix on save
+            vim.api.nvim_create_autocmd('BufWritePre', {
+              buffer = bufnr,
+              command = 'EslintFixAll',
+            })
+          end,
+          -- Mostly copied from the source on_new_config
+          on_new_config = function(config, new_root_dir)
+            local has_biome = vim.fn.filereadable(new_root_dir .. '/biome.json') == 1
+
+            if has_biome then
+              -- Disable eslint for projects using Biome
+              return false
+            end
+
+            -- The "workspaceFolder" is a VSCode concept. It limits how far the
+            -- server will traverse the file system when locating the ESLint config
+            -- file (e.g., .eslintrc).
+            config.settings.workspaceFolder = {
+              uri = new_root_dir,
+              name = vim.fn.fnamemodify(new_root_dir, ':t'),
+            }
+
+            -- HACK: Set max memory for the frontend application
+            -- We can't use on_init, as that doesn't modify the config in time
+            if string.match(new_root_dir, 'frontend') then
+              config.cmd_env = config.cmd_env or {}
+              config.cmd_env = {
+                NODE_OPTIONS = '--max-old-space-size=8192',
+              }
+            end
+
+            -- Support flat config
+            if
+              vim.fn.filereadable(new_root_dir .. '/eslint.config.js') == 1
+              or vim.fn.filereadable(new_root_dir .. '/eslint.config.mjs') == 1
+              or vim.fn.filereadable(new_root_dir .. '/eslint.config.ts') == 1
+              or vim.fn.filereadable(new_root_dir .. '/eslint.config.mts') == 1
+            then
+              config.settings.experimental.useFlatConfig = true
+            end
+          end,
+          handlers = {
+            ['eslint/openDoc'] = function(_, result)
+              if not result then
+                return
+              end
+              local sysname = vim.uv.os_uname().sysname
+              if sysname:match 'Windows' then
+                os.execute(string.format('start %q', result.url))
+              elseif sysname:match 'Linux' then
+                os.execute(string.format('xdg-open %q', result.url))
+              else
+                os.execute(string.format('open %q', result.url))
+              end
+              return {}
+            end,
+            ['eslint/confirmESLintExecution'] = function(_, result)
+              if not result then
+                return
+              end
+              return 4 -- approved
+            end,
+            ['eslint/probeFailed'] = function()
+              vim.notify('[lspconfig] ESLint probe failed.', vim.log.levels.WARN)
+              return {}
+            end,
+            ['eslint/noLibrary'] = function()
+              vim.notify('[lspconfig] Unable to find ESLint library.', vim.log.levels.WARN)
+              return {}
+            end,
+          },
+        },
       }
 
       -- Ensure the servers and tools above are installed
@@ -647,9 +860,13 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        'shellcheck',
+        'prettierd',
+        'tailwindcss',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
+      ---@diagnostic disable-next-line: missing-fields -- New Lua LSP can detect 'missing' fields better, but here the other fields are not required
       require('mason-lspconfig').setup {
         handlers = {
           function(server_name)
@@ -703,7 +920,20 @@ require('lazy').setup({
         -- python = { "isort", "black" },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
-        -- javascript = { "prettierd", "prettier", stop_after_first = true },
+        javascript = { 'biome', 'prettierd', 'prettier', stop_after_first = true },
+        typescript = { 'biome', 'prettierd', 'prettier', stop_after_first = true },
+        typescriptreact = { 'biome', 'prettierd', 'prettier', stop_after_first = true },
+        html = { 'prettierd', 'prettier', stop_after_first = true },
+        htmlangular = { 'prettierd', 'prettier', stop_after_first = true },
+        json = { 'biome', 'prettierd', 'prettier', stop_after_first = true },
+      },
+
+      formatters = {
+        biome = {
+          condition = function(self, ctx)
+            return vim.fn.filereadable(ctx.dirname .. '/biome.json') == 1
+          end,
+        },
       },
     },
   },
@@ -728,12 +958,20 @@ require('lazy').setup({
           -- `friendly-snippets` contains a variety of premade snippets.
           --    See the README about individual language/framework/plugin snippets:
           --    https://github.com/rafamadriz/friendly-snippets
-          -- {
-          --   'rafamadriz/friendly-snippets',
-          --   config = function()
-          --     require('luasnip.loaders.from_vscode').lazy_load()
-          --   end,
-          -- },
+          {
+            'rafamadriz/friendly-snippets',
+            config = function()
+              require('luasnip').filetype_extend('javascript', { 'jsdoc' })
+              require('luasnip').filetype_extend('typescript', { 'tsdoc' })
+
+              require('luasnip.loaders.from_vscode').lazy_load()
+              require('luasnip.loaders.from_lua').lazy_load {
+                paths = {
+                  './lua/snippets',
+                },
+              }
+            end,
+          },
         },
       },
       'saadparwaiz1/cmp_luasnip',
@@ -779,7 +1017,8 @@ require('lazy').setup({
 
           -- If you prefer more traditional completion keymaps,
           -- you can uncomment the following lines
-          --['<CR>'] = cmp.mapping.confirm { select = true },
+          ['<CR>'] = cmp.mapping.confirm { select = true },
+          ['<Tab>'] = cmp.mapping.confirm { select = true },
           --['<Tab>'] = cmp.mapping.select_next_item(),
           --['<S-Tab>'] = cmp.mapping.select_prev_item(),
 
@@ -843,8 +1082,24 @@ require('lazy').setup({
   },
 
   -- Highlight todo, notes, etc in comments
-  { 'folke/todo-comments.nvim', event = 'VimEnter', dependencies = { 'nvim-lua/plenary.nvim' }, opts = { signs = false } },
-
+  {
+    'folke/todo-comments.nvim',
+    event = 'VimEnter',
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    opts = {
+      keywords = {
+        NOTE = { icon = ' ', color = 'hint', alt = { 'Note', 'INFO', 'IMPORTANT' } },
+      },
+      highlight = {
+        -- original pattern: [[.*<(KEYWORDS)\s*:]]
+        -- Highlight any TODO or TODO(foo)
+        pattern = [[.*<((KEYWORDS\s?)(\(.*\))?):]],
+      },
+      -- original pattern: [[\b(KEYWORDS):]],
+      pattern = [[\b((KEYWORDS)(\(.*\))?):]],
+      signs = false,
+    },
+  },
   { -- Collection of various small independent plugins/modules
     'echasnovski/mini.nvim',
     config = function()
@@ -862,6 +1117,22 @@ require('lazy').setup({
       -- - sd'   - [S]urround [D]elete [']quotes
       -- - sr)'  - [S]urround [R]eplace [)] [']
       require('mini.surround').setup()
+
+      require('mini.move').setup {
+        mappings = {
+          -- Move visual selection in Visual mode.
+          left = 'H',
+          right = 'L',
+          down = 'J',
+          up = 'K',
+
+          -- Move current line in Normal mode
+          line_left = 'H',
+          line_right = 'L',
+          line_down = 'J',
+          line_up = 'K',
+        },
+      }
 
       -- Simple and easy statusline.
       --  You could remove this setup call if you don't like it,
@@ -907,6 +1178,19 @@ require('lazy').setup({
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
   },
+  {
+    -- Use a fork of `pmizio/typescript-tools.nvim` that has a fix to place "Add import" quick fixes to the top
+    'JulienZD/typescript-tools.nvim',
+    dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
+    opts = {
+      settings = {
+        tsserver_file_preferences = {
+          importModuleSpecifierPreference = 'shortest',
+          importModuleSpecifierEnding = 'minimal',
+        },
+      },
+    },
+  },
 
   -- The following two comments only work if you have downloaded the kickstart repo, not just copy pasted the
   -- init.lua. If you want these files, they are in the repository, so you can just download them and
@@ -918,10 +1202,10 @@ require('lazy').setup({
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
   -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
+  require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.neo-tree',
   -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
@@ -930,7 +1214,152 @@ require('lazy').setup({
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
   -- { import = 'custom.plugins' },
+
+  -- UI
+  {
+    'folke/noice.nvim',
+    event = 'VeryLazy',
+    config = function()
+      require('noice').setup {
+        lsp = {
+          override = {
+            ['vim.lsp.util.convert_input_to_markdown_lines'] = true,
+            ['vim.lsp.util.stylize_markdown'] = true,
+            ['cmp.entry.get_documentation'] = true, -- requires hrsh7th/nvim-cmp
+          },
+        },
+        presets = {
+          bottom_search = true,
+          command_palette = true,
+          long_message_to_split = true,
+          inc_rename = true,
+          lsp_doc_border = true,
+        },
+        views = {
+          cmdline_popup = {
+            position = '50%',
+          },
+        },
+        routes = {
+          {
+            -- Remove the "No information available" messages, as they're showing up way too often when using LSP
+            filter = {
+              event = 'notify',
+              find = 'No information available',
+            },
+            opts = { skip = true },
+          },
+        },
+      }
+
+      vim.keymap.set({ 'n', 'i', 's' }, '<c-f>', function()
+        if not require('noice.lsp').scroll(4) then
+          return '<c-f>'
+        end
+      end, { silent = true, expr = true })
+
+      vim.keymap.set({ 'n', 'i', 's' }, '<c-b>', function()
+        if not require('noice.lsp').scroll(-4) then
+          return '<c-b>'
+        end
+      end, { silent = true, expr = true })
+    end,
+    dependencies = {
+      'MunifTanjim/nui.nvim',
+    },
+  },
+  {
+    'axelvc/template-string.nvim',
+    opts = {
+      remove_template_string = true,
+    },
+  },
+  'github/copilot.vim',
+  {
+    'smjonas/inc-rename.nvim',
+    config = function()
+      require('inc_rename').setup()
+
+      vim.keymap.set('n', '<leader>rn', function()
+        return ':IncRename ' .. vim.fn.expand '<cword>'
+      end, { expr = true })
+    end,
+  },
+  {
+    'joeveiga/ng.nvim',
+    config = function()
+      local ng = require 'ng'
+      vim.keymap.set('n', '<leader>at', ng.goto_template_for_component, { noremap = true, silent = true, desc = 'Go to [A]ngular [T]emplate' })
+      vim.keymap.set('n', '<leader>ac', ng.goto_component_with_template_file, { noremap = true, silent = true, desc = 'Go to [A]ngular [C]omponent' })
+    end,
+  },
+  {
+    'dlvandenberg/tree-sitter-angular',
+    config = function()
+      vim.filetype.add {
+        pattern = {
+          ['.*%.component%.html'] = 'htmlangular',
+        },
+      }
+
+      vim.cmd 'runtime! ftplugin/html.vim!'
+
+      require('lspconfig').angularls.setup {
+        filetypes = { 'typescript', 'html', 'typescriptreact', 'typescript.tsx', 'htmlangular' },
+      }
+    end,
+  },
+  {
+    'folke/flash.nvim',
+    event = 'VeryLazy',
+    ---@type Flash.Config
+    opts = {},
+    -- stylua: ignore
+    keys = {
+      { "s", mode = { "n", "x", "o" }, function() require("flash").jump() end, desc = "Flash" },
+      { "S", mode = { "n", "x", "o" }, function() require("flash").treesitter() end, desc = "Flash Treesitter" },
+      { "R", mode = { "o", "x" }, function() require("flash").treesitter_search() end, desc = "Treesitter Search" },
+      { "<c-s>", mode = { "c" }, function() require("flash").toggle() end, desc = "Toggle Flash Search" },
+    },
+  },
+  {
+    'kdheepak/lazygit.nvim',
+    lazy = true,
+    cmd = {
+      'LazyGit',
+      'LazyGitConfig',
+      'LazyGitCurrentFile',
+      'LazyGitFilter',
+      'LazyGitFilterCurrentFile',
+    },
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    keys = {
+      { '<leader>lg', '<cmd>LazyGit<cr>', desc = '[L]azy[G]it' },
+    },
+  },
+  {
+    'lukas-reineke/virt-column.nvim',
+    opts = {
+      char = { '┆' },
+      virtcolumn = '120',
+      highlight = { 'NonText' },
+    },
+  },
+  {
+    'nvimdev/lspsaga.nvim',
+    opts = {},
+    dependencies = {
+      'nvim-treesitter/nvim-treesitter',
+      'nvim-tree/nvim-web-devicons',
+      'nvim-lspconfig',
+    },
+  },
 }, {
+  {
+    change_detection = {
+      notify = false,
+    },
+  },
   ui = {
     -- If you are using a Nerd Font: set icons to an empty table which will use the
     -- default lazy.nvim defined Nerd Font icons, otherwise define a unicode icons table

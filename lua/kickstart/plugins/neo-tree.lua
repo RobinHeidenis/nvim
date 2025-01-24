@@ -20,6 +20,19 @@ return {
           ['\\'] = 'close_window',
         },
       },
+      filtered_items = {
+        visible = true,
+        hide_dotfiles = false,
+        hide_gitignore = false,
+        never_show = {
+          '.git',
+        },
+      },
+      follow_current_file = {
+        enabled = true,
+      },
+      use_libuv_file_watcher = true,
     },
+    close_if_last_window = true,
   },
 }
