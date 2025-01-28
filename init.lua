@@ -1185,7 +1185,14 @@ require('lazy').setup({
     opts = {
       settings = {
         tsserver_file_preferences = {
-          importModuleSpecifierPreference = 'shortest',
+          importModuleSpecifierPreference = (function()
+            local is_angular = vim.fn.filereadable 'angular.json' == 1
+            if is_angular then
+              return 'relative'
+            end
+
+            return 'shortest'
+          end)(),
           importModuleSpecifierEnding = 'minimal',
         },
       },
