@@ -752,8 +752,7 @@ require('lazy').setup({
             'typescript.tsx',
             'typescriptreact',
           },
-
-          root_dir = require('lspconfig.util').root_pattern 'biome.json',
+          root_dir = require('lspconfig.util').root_pattern 'biome.jsonc',
         },
 
         -- For some reason the example lint plugin with eslint_d doesn't work, so I have to use eslint :(
@@ -771,8 +770,8 @@ require('lazy').setup({
             'svelte',
             'astro',
           },
-          on_attach = function(_client, bufnr)
             -- Auto-fix on save
+          on_attach = function(client, bufnr)
             vim.api.nvim_create_autocmd('BufWritePre', {
               buffer = bufnr,
               command = 'EslintFixAll',
@@ -780,10 +779,43 @@ require('lazy').setup({
           end,
           -- Mostly copied from the source on_new_config
           on_new_config = function(config, new_root_dir)
-            local has_biome = vim.fn.filereadable(new_root_dir .. '/biome.json') == 1
+            local function check_eslint_config(root_dir)
+              -- New style config files
+              local new_style_configs = {
+                '/eslint.config.js',
+                '/eslint.config.mjs',
+                '/eslint.config.ts',
+                '/eslint.config.mts',
+              }
 
-            if has_biome then
-              -- Disable eslint for projects using Biome
+              -- Old style config files
+              local old_style_configs = {
+                '/.eslintrc.js',
+                '/.eslintrc.cjs',
+                '/.eslintrc.yaml',
+                '/.eslintrc.yml',
+                '/.eslintrc.json',
+              }
+
+              -- Check for new style configs
+              for _, file in ipairs(new_style_configs) do
+                if vim.fn.filereadable(root_dir .. file) == 1 then
+                  return { found = true, is_flat_config = true }
+                end
+              end
+
+              -- Check for old style configs
+              for _, file in ipairs(old_style_configs) do
+                if vim.fn.filereadable(root_dir .. file) == 1 then
+                  return { found = true, is_flat_config = false }
+                end
+              end
+
+              return { found = false, is_flat_config = false }
+            end
+
+            local eslint_check_result = check_eslint_config(new_root_dir)
+            if not eslint_check_result.found then
               return false
             end
 
@@ -805,12 +837,7 @@ require('lazy').setup({
             end
 
             -- Support flat config
-            if
-              vim.fn.filereadable(new_root_dir .. '/eslint.config.js') == 1
-              or vim.fn.filereadable(new_root_dir .. '/eslint.config.mjs') == 1
-              or vim.fn.filereadable(new_root_dir .. '/eslint.config.ts') == 1
-              or vim.fn.filereadable(new_root_dir .. '/eslint.config.mts') == 1
-            then
+            if eslint_check_result.is_flat_config then
               config.settings.experimental.useFlatConfig = true
             end
           end,
@@ -897,7 +924,6 @@ require('lazy').setup({
       },
     },
     opts = {
-      notify_on_error = false,
       format_on_save = function(bufnr)
         -- Disable "format_on_save lsp_fallback" for languages that don't
         -- have a well standardized coding style. You can add additional
@@ -926,13 +952,17 @@ require('lazy').setup({
         html = { 'prettierd', 'prettier', stop_after_first = true },
         htmlangular = { 'prettierd', 'prettier', stop_after_first = true },
         json = { 'biome', 'prettierd', 'prettier', stop_after_first = true },
+        jsonc = { 'biome', 'prettierd', 'prettier', stop_after_first = true },
       },
 
       formatters = {
         biome = {
           condition = function(self, ctx)
-            return vim.fn.filereadable(ctx.dirname .. '/biome.json') == 1
+            return vim.fn.filereadable(vim.fn.getcwd() .. '/biome.jsonc') == 1
           end,
+          command = 'biome',
+          args = { 'check', '--apply', '--stdin-file-path', '$FILENAME' },
+          stdin = true,
         },
       },
     },
