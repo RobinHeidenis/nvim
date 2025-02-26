@@ -236,6 +236,18 @@ vim.api.nvim_create_autocmd({ 'FocusLost', 'ModeChanged', 'TextChanged', 'BufEnt
   command = 'silent! update',
 })
 
+vim.api.nvim_create_user_command('Format', function(args)
+  local range = nil
+  if args.count ~= -1 then
+    local end_line = vim.api.nvim_buf_get_lines(0, args.line2 - 1, args.line2, true)[1]
+    range = {
+      start = { args.line1, 0 },
+      ['end'] = { args.line2, end_line:len() },
+    }
+  end
+  require('conform').format { async = true, lsp_format = 'fallback', range = range }
+end, { range = true })
+
 vim.filetype.add {
   extension = {
     env = 'sh',
@@ -770,11 +782,39 @@ require('lazy').setup({
             'svelte',
             'astro',
           },
-            -- Auto-fix on save
+          -- Auto-fix on save
           on_attach = function(client, bufnr)
             vim.api.nvim_create_autocmd('BufWritePre', {
               buffer = bufnr,
-              command = 'EslintFixAll',
+              callback = function()
+                -- Check if biome config exists, then run conform with biome formatter
+                local biome_config_path = vim.fn.getcwd() .. '/biome.jsonc'
+                if vim.fn.filereadable(biome_config_path) == 1 then
+                  -- Run conform with biome formatter
+                  require('conform').format {
+                    formatters = { 'biome' },
+                    bufnr = bufnr,
+                    async = true,
+                  }
+
+                  -- Wait for biome to finish before running eslint fixes
+                  vim.defer_fn(function()
+                    -- Run ESLintFixAll after biome formatting
+                    vim.cmd 'EslintFixAll'
+
+                    vim.defer_fn(function()
+                      require('conform').format {
+                        formatters = { 'biome' },
+                        bufnr = bufnr,
+                        async = true,
+                      }
+                    end, 100)
+                  end, 100) -- Delay 100ms to allow biome to apply first
+                else
+                  -- Run ESLintFixAll
+                  vim.cmd 'EslintFixAll'
+                end
+              end,
             })
           end,
           -- Mostly copied from the source on_new_config
@@ -1129,6 +1169,12 @@ require('lazy').setup({
       pattern = [[\b((KEYWORDS)(\(.*\))?):]],
       signs = false,
     },
+  },
+  {
+    'folke/ts-comments.nvim',
+    opts = {},
+    event = 'VeryLazy',
+    enabled = vim.fn.has 'nvim-0.10.0' == 1,
   },
   { -- Collection of various small independent plugins/modules
     'echasnovski/mini.nvim',
