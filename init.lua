@@ -515,6 +515,7 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
       vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
       vim.keymap.set('n', '<leader><leader>', builtin.buffers, { desc = '[ ] Find existing buffers' })
+      vim.keymap.set('n', '<leader>sb', builtin.git_branches, { desc = '[S]earch Git [B]ranches' })
 
       -- Slightly advanced example of overriding default behavior and theme
       vim.keymap.set('n', '<leader>/', function()
@@ -554,6 +555,47 @@ require('lazy').setup({
       'kkharji/sqlite.lua',
       { 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
     },
+  },
+  {
+    'folke/trouble.nvim',
+    opts = {}, -- for default options, refer to the configuration section for custom setup.
+    cmd = 'Trouble',
+    keys = {
+      {
+        '<leader>xx',
+        '<cmd>Trouble diagnostics toggle<cr>',
+        desc = 'Diagnostics (Trouble)',
+      },
+      {
+        '<leader>xf',
+        '<cmd>Trouble diagnostics toggle filter.buf=0<cr>',
+        desc = 'Buffer Diagnostics (Trouble)',
+      },
+      {
+        '<leader>cs',
+        '<cmd>Trouble symbols toggle focus=false<cr>',
+        desc = 'Symbols (Trouble)',
+      },
+      {
+        '<leader>cl',
+        '<cmd>Trouble lsp toggle focus=false win.position=right<cr>',
+        desc = 'LSP Definitions / references / ... (Trouble)',
+      },
+      {
+        '<leader>xL',
+        '<cmd>Trouble loclist toggle<cr>',
+        desc = 'Location List (Trouble)',
+      },
+      {
+        '<leader>xQ',
+        '<cmd>Trouble qflist toggle<cr>',
+        desc = 'Quickfix List (Trouble)',
+      },
+    },
+  },
+  {
+    'christoomey/vim-tmux-navigator',
+    lazy = false,
   },
 
   -- LSP Plugins
@@ -1178,6 +1220,12 @@ require('lazy').setup({
   },
   { -- Collection of various small independent plugins/modules
     'echasnovski/mini.nvim',
+    dependencies = {
+      {
+        'JulienZD/copilot-statusline.nvim',
+        opts = {},
+      },
+    },
     config = function()
       -- Better Around/Inside textobjects
       --
@@ -1214,8 +1262,39 @@ require('lazy').setup({
       --  You could remove this setup call if you don't like it,
       --  and try some other statusline plugin
       local statusline = require 'mini.statusline'
-      -- set use_icons to true if you have a Nerd Font
-      statusline.setup { use_icons = vim.g.have_nerd_font }
+      -- This is the default active function, with the additions for copilot-statusline marked
+      local active = function()
+        local mode, mode_hl = statusline.section_mode { trunc_width = 100 }
+        local git = statusline.section_git { trunc_width = 40 }
+        local diff = statusline.section_diff { trunc_width = 75 }
+        local diagnostics = statusline.section_diagnostics { trunc_width = 75 }
+        local lsp = statusline.section_lsp { trunc_width = 75 }
+        local filename = statusline.section_filename { trunc_width = 140 }
+        local fileinfo = statusline.section_fileinfo { trunc_width = 120 }
+        local location = statusline.section_location { trunc_width = 75 }
+        local search = statusline.section_searchcount { trunc_width = 75 }
+
+        -- This line below is added
+        local copilot = require('copilot-statusline').section_copilot { trunc_width = 75 }
+
+        return statusline.combine_groups {
+          { hl = mode_hl, strings = { mode } },
+          { hl = 'MiniStatuslineDevinfo', strings = { git, diff, diagnostics, lsp } },
+          '%<', -- Mark general truncate point
+          { hl = 'MiniStatuslineFilename', strings = { filename } },
+          '%=', -- End left alignment
+          -- This line below is added
+          { hl = 'MiniStatuslineCopilot', strings = { copilot } },
+          { hl = 'MiniStatuslineFileinfo', strings = { fileinfo } },
+          { hl = mode_hl, strings = { search, location } },
+        }
+      end
+
+      statusline.setup {
+        content = { active = active },
+        -- set use_icons to true if you have a Nerd Font
+        use_icons = vim.g.have_nerd_font,
+      }
 
       -- You can configure sections in the statusline by overriding their
       -- default behavior. For example, here we set the section for
@@ -1357,7 +1436,20 @@ require('lazy').setup({
       remove_template_string = true,
     },
   },
-  'github/copilot.vim',
+  {
+    'zbirenbaum/copilot.lua',
+    cmd = 'Copilot',
+    event = 'InsertEnter',
+    config = function()
+      require('copilot').setup {
+        suggestion = {
+          enabled = true,
+          auto_trigger = true,
+        },
+        panel = { enabled = false },
+      }
+    end,
+  },
   {
     'smjonas/inc-rename.nvim',
     config = function()
@@ -1430,7 +1522,11 @@ require('lazy').setup({
   },
   {
     'nvimdev/lspsaga.nvim',
-    opts = {},
+    opts = {
+      code_action_prompt = {
+        enable = false,
+      },
+    },
     dependencies = {
       'nvim-treesitter/nvim-treesitter',
       'nvim-tree/nvim-web-devicons',
