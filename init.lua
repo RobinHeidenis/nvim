@@ -165,7 +165,15 @@ vim.opt.iskeyword:append '$'
 
 -- Clear highlights on search when pressing <Esc> in normal mode
 --  See `:help hlsearch`
-vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
+vim.keymap.set('n', '<Esc>', function()
+  vim.cmd.nohlsearch()
+  local flash = require 'flash.plugins.char'
+  if flash.state then
+    flash.state:hide()
+  end
+end)
+
+vim.keymap.set('n', '<leader><leader>x', '<cmd>source %<CR>', { desc = 'Execute the current file' })
 
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
@@ -832,8 +840,9 @@ require('lazy').setup({
                 -- Check if biome config exists, then run conform with biome formatter
                 local biome_config_path = vim.fn.getcwd() .. '/biome.jsonc'
                 if vim.fn.filereadable(biome_config_path) == 1 then
+                  local conform = require 'conform'
                   -- Run conform with biome formatter
-                  require('conform').format {
+                  conform.format {
                     formatters = { 'biome' },
                     bufnr = bufnr,
                     async = true,
@@ -845,7 +854,7 @@ require('lazy').setup({
                     vim.cmd 'EslintFixAll'
 
                     vim.defer_fn(function()
-                      require('conform').format {
+                      conform.format {
                         formatters = { 'biome' },
                         bufnr = bufnr,
                         async = true,
@@ -1375,7 +1384,7 @@ require('lazy').setup({
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
 
   -- UI
   {
