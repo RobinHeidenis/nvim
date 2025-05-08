@@ -1044,6 +1044,8 @@ require('lazy').setup({
         htmlangular = { 'prettierd', 'prettier', stop_after_first = true },
         json = { 'biome', 'prettierd', 'prettier', stop_after_first = true },
         jsonc = { 'biome', 'prettierd', 'prettier', stop_after_first = true },
+        scss = { 'prettierd', 'prettier', stop_after_first = true },
+        css = { 'biome', 'prettierd', 'prettier', stop_after_first = true },
       },
 
       formatters = {
