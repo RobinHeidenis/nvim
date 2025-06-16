@@ -233,6 +233,8 @@ vim.keymap.set('n', 'Y', 'yy', { noremap = true })
 vim.keymap.set('n', '<leader>vs', ':vsplit<CR>', { noremap = true })
 vim.keymap.set('n', '<leader>vv', ':split<CR>', { noremap = true })
 
+
+
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 

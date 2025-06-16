@@ -3,6 +3,7 @@ return {
   ---@module 'oil'
   ---@type oil.SetupOpts
   opts = {
+    default_file_explorer = true,
     view_options = {
       show_hidden = true,
       is_always_hidden = function(name)
@@ -22,5 +23,5 @@ return {
     { '-', ':Oil<CR>', desc = 'Open Oil' },
   },
   dependencies = { { 'echasnovski/mini.icons', opts = {} } },
-  -- dependencies = { 'nvim-tree/nvim-web-devicons' },
+  lazy = false,
 }

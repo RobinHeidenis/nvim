@@ -1,5 +1,5 @@
 return {
   {
-    dir = '~/dev/plugins/gitlab.nvim',
+    -- dir = '~/dev/plugins/gitlab.nvim',
   },
 }
