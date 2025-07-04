@@ -233,8 +233,6 @@ vim.keymap.set('n', 'Y', 'yy', { noremap = true })
 vim.keymap.set('n', '<leader>vs', ':vsplit<CR>', { noremap = true })
 vim.keymap.set('n', '<leader>vv', ':split<CR>', { noremap = true })
 
-
-
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 
@@ -1559,21 +1557,6 @@ require('lazy').setup({
       { "S", mode = { "n", "x", "o" }, function() require("flash").treesitter() end, desc = "Flash Treesitter" },
       { "R", mode = { "o", "x" }, function() require("flash").treesitter_search() end, desc = "Treesitter Search" },
       { "<c-s>", mode = { "c" }, function() require("flash").toggle() end, desc = "Toggle Flash Search" },
-    },
-  },
-  {
-    'kdheepak/lazygit.nvim',
-    lazy = true,
-    cmd = {
-      'LazyGit',
-      'LazyGitConfig',
-      'LazyGitCurrentFile',
-      'LazyGitFilter',
-      'LazyGitFilterCurrentFile',
-    },
-    dependencies = { 'nvim-lua/plenary.nvim' },
-    keys = {
-      { '<leader>lg', '<cmd>LazyGit<cr>', desc = '[L]azy[G]it' },
     },
   },
   {
