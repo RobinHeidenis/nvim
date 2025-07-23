@@ -156,13 +156,17 @@ vim.o.cursorline = true
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.o.scrolloff = 10
 
+vim.g.is_angular_project = vim.fn.filereadable './angular.json' == 1
+
+if vim.g.is_angular_project then
+  -- Include $ as part of words, so they're included when renaming (Angular/RxJS uses this a lot)
+  vim.o.iskeyword:append '$'
+end
+
 -- if performing an operation that would fail due to unsaved changes in the buffer (like `:q`),
 -- instead raise a dialog asking if you wish to save the current file(s)
 -- See `:help 'confirm'`
 vim.o.confirm = true
-
--- Include $ as part of words, so they're included when renaming (Angular/RxJS uses this a lot)
-vim.opt.iskeyword:append '$'
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
@@ -1381,26 +1385,6 @@ require('lazy').setup({
     --    - Incremental selection: Included, see `:help nvim-treesitter-incremental-selection-mod`
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
-  },
-  {
-    -- Use a fork of `pmizio/typescript-tools.nvim` that has a fix to place "Add import" quick fixes to the top
-    'pmizio/typescript-tools.nvim',
-    dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
-    opts = {
-      settings = {
-        tsserver_file_preferences = {
-          importModuleSpecifierPreference = (function()
-            local is_angular = vim.fn.filereadable 'angular.json' == 1
-            if is_angular then
-              return 'relative'
-            end
-
-            return 'shortest'
-          end)(),
-          importModuleSpecifierEnding = 'minimal',
-        },
-      },
-    },
   },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
